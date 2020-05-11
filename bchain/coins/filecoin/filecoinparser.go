@@ -37,13 +37,15 @@ func init() {
 
 // FilecoinParser handle
 type FilecoinParser struct {
-	*btc.BitcoinParser
+	//*btc.BitcoinParser
+	Config *Configuration
 }
 
 // NewFilecoinParser returns new DashParser instance
-func NewFilecoinParser(params *chaincfg.Params, c *btc.Configuration) *FilecoinParser {
+func NewFilecoinParser(c *Configuration) *FilecoinParser {
 	return &FilecoinParser{
-		BitcoinParser: btc.NewBitcoinParser(params, c),
+		//BitcoinParser: btc.NewBitcoinParser(params, c),
+		Config: c,
 	}
 }
 

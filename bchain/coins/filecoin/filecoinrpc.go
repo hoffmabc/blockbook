@@ -4,63 +4,86 @@ import (
 	"blockbook/bchain"
 	"blockbook/bchain/coins/btc"
 	"encoding/json"
+	"github.com/hoffmabc/blockbook/bchain/coins/eth"
+
+	//"net/rpc"
 
 	"github.com/juju/errors"
 
 	"github.com/golang/glog"
+
+	"github.com/filecoin-project/lotus/api"
 )
+
+// Configuration represents json config file
+type Configuration struct {
+	CoinName                    string `json:"coin_name"`
+	CoinShortcut                string `json:"coin_shortcut"`
+	RPCURL                      string `json:"rpc_url"`
+	RPCTimeout                  int    `json:"rpc_timeout"`
+	BlockAddressesToKeep        int    `json:"block_addresses_to_keep"`
+	MempoolTxTimeoutHours       int    `json:"mempoolTxTimeoutHours"`
+	QueryBackendOnMempoolResync bool   `json:"queryBackendOnMempoolResync"`
+}
 
 // FloRPC is an interface to JSON-RPC bitcoind service.
 type FilecoinRPC struct {
-	*btc.BitcoinRPC
+	//*btc.BitcoinRPC
+	fullNode    api.FullNode
+	Parser      *FilecoinParser
+	ChainConfig *Configuration
+	Mempool     *bchain.MempoolFilecoinType
 }
 
 // NewFilecoinRPC returns new FilecoinRPC instance.
 func NewFilecoinRPC(config json.RawMessage, pushHandler func(bchain.NotificationType)) (bchain.BlockChain, error) {
-	b, err := btc.NewBitcoinRPC(config, pushHandler)
-	if err != nil {
-		return nil, err
-	}
+	//var err error
+	var c Configuration
+	err = json.Unmarshal(config, &c)
+
+	//b, err := btc.NewBitcoinRPC(config, pushHandler)
+	//if err != nil {
+	//	return nil, err
+	//}
 
 	s := &FilecoinRPC{
-		b.(*btc.BitcoinRPC),
+		//b.(*btc.BitcoinRPC),
+		fullNode: client.NewFullNodeRPC("http://"+c.RPCURL, nil),
+		config:   c,
 	}
-	s.RPCMarshaler = btc.JSONMarshalerV2{}
-	s.ChainConfig.SupportsEstimateFee = false
+
+	// always create parser
+	s.Parser = NewFilecoinParser(s.ChainConfig)
 
 	return s, nil
 }
 
-// Initialize initializes FloRPC instance.
+// Initialize initializes FilecoinRPC instance.
 func (f *FilecoinRPC) Initialize() error {
-	ci, err := f.GetChainInfo()
-	if err != nil {
-		return err
-	}
-	chainName := ci.Chain
 
-	glog.Info("Chain name ", chainName)
-	params := GetChainParams(chainName)
-
-	// always create parser
-	f.Parser = NewFilecoinParser(params, f.ChainConfig)
+	//f.Network = "testnet"
+	//f.Testnet = true
 
 	// parameters for getInfo request
-	if params.Net == MainnetMagic {
-		f.Testnet = false
-		f.Network = "livenet"
-	} else {
-		f.Testnet = true
-		f.Network = "testnet"
-	}
+	//if params.Net == MainnetMagic {
+	//	f.Testnet = false
+	//	f.Network = "livenet"
+	//} else {
+	//	f.Testnet = true
+	//	f.Network = "testnet"
+	//}
 
-	glog.Info("rpc: block chain ", params.Name)
+	//glog.Info("rpc: block chain ", params.Name)
 
 	return nil
 }
 
 // GetBlock returns block with given hash.
 func (f *FilecoinRPC) GetBlock(hash string, height uint32) (*bchain.Block, error) {
+
+	// ChainGetBlock
+	//
+
 	var err error
 	if hash == "" {
 		hash, err = f.GetBlockHash(height)
@@ -131,4 +154,13 @@ func (f *FilecoinRPC) GetBlockFull(hash string) (*bchain.Block, error) {
 // It could be optimized for mempool, i.e. without block time and confirmations
 func (f *FilecoinRPC) GetTransactionForMempool(txid string) (*bchain.Tx, error) {
 	return f.GetTransaction(txid)
+}
+
+// CreateMempool creates mempool if not already created, however does not initialize it
+func (b *FilecoinRPC) CreateMempool(chain bchain.BlockChain) (bchain.Mempool, error) {
+	if b.Mempool == nil {
+		b.Mempool = bchain.NewMempoolFilecoinType(chain, b.ChainConfig.MempoolTxTimeoutHours, b.ChainConfig.QueryBackendOnMempoolResync)
+		glog.Info("mempool created, MempoolTxTimeoutHours=", b.ChainConfig.MempoolTxTimeoutHours, ", QueryBackendOnMempoolResync=", b.ChainConfig.QueryBackendOnMempoolResync)
+	}
+	return b.Mempool, nil
 }

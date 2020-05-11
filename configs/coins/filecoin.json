@@ -20,7 +20,7 @@
   },
   "backend": {
     "package_name": "backend-filecoin",
-    "package_revision": "satoshilabs-1",
+    "package_revision": "openbazaar",
     "system_user": "filecoin",
     "version": "0.2.10",
     "binary_url": "https://github.com/filecoin-project/lotus/releases/download/v0.2.8/lotus_v0.2.8_linux-amd64.tar.gz",
